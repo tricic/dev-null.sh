@@ -64,7 +64,7 @@ final readonly class OpenGraphCanvas
     private const int CODE_INK_MUTED = 0xA1A1A6;
 
     /**
-     * The dark theme's colours for the classes tempest/highlight emits. Keep in sync with resources/css/app.css.
+     * The dark theme's colors for the classes tempest/highlight emits. Keep in sync with resources/css/app.css.
      *
      * @var array<string, int>
      */
@@ -213,13 +213,22 @@ final readonly class OpenGraphCanvas
      */
     public function window(int $x, int $y, int $width, int $height, ?string $language): void
     {
-        $this->roundedRect($x, $y, $x + $width, $y + $height, self::WINDOW_RADIUS, self::CODE_SHELL);
+        $radius = self::WINDOW_RADIUS;
+
+        $this->rect($x + $radius, $y, $x + $width - $radius, $y + $height, self::CODE_SHELL);
+        $this->rect($x, $y + $radius, $x + $width, $y + $height - $radius, self::CODE_SHELL);
+
+        foreach ([[$x + $radius, $y + $radius], [$x + $width - $radius, $y + $radius], [$x + $radius, $y + $height - $radius], [$x + $width - $radius, $y + $height - $radius]] as [$cornerX, $cornerY]) {
+            $this->circle($cornerX, $cornerY, $radius, self::CODE_SHELL);
+        }
 
         foreach ([self::LANES[0], self::LANES[5], self::LANES[1]] as $index => $color) {
             $this->circle($x + self::WINDOW_PADDING + 6 + $index * 24, $y + self::WINDOW_TITLE_HEIGHT / 2, 6, $color);
         }
 
-        if ($language !== null) {
+        $language = $this->clean((string) $language);
+
+        if ($language !== '') {
             $label = $this->truncate($language, 'GeistMono-Regular', 20, intdiv($width, 2));
 
             $this->text($label, 'GeistMono-Regular', 20, $x + $width - self::WINDOW_PADDING - $this->width($label, 'GeistMono-Regular', 20), $y + intdiv(self::WINDOW_TITLE_HEIGHT, 2) + 7, self::CODE_INK_MUTED);
@@ -227,7 +236,7 @@ final readonly class OpenGraphCanvas
     }
 
     /**
-     * Highlighted lines of code from the top of their first line, in the colour of the innermost class that has one.
+     * Highlighted lines of code from the top of their first line, in the color of the innermost class that has one.
      * GeistMono is monospaced, so each run is placed by its column, which keeps indentation that a measured width of
      * leading spaces would lose. Lines are cut with an ellipsis at the width rather than wrapped.
      *
@@ -241,12 +250,12 @@ final readonly class OpenGraphCanvas
         foreach ($lines as $index => $runs) {
             $baseline = $y + $index * $lineHeight + intdiv($lineHeight + $size, 2) - intdiv($size, 5);
 
-            $runs = array_map(fn (array $run): array => [
+            $runs = collect($runs)->map(fn (array $run): array => [
                 'text' => (string) preg_replace(self::EMOJI, '', $run['text']),
-                'color' => $this->codeColor($run['classes']),
-            ], $runs);
+                'color' => collect($run['classes'])->reverse()->map(fn (string $class): ?int => self::CODE_COLORS[$class] ?? null)->first(fn (?int $color): bool => $color !== null) ?? self::CODE_INK,
+            ]);
 
-            $length = array_sum(array_map(fn (array $run): int => mb_strlen($run['text']), $runs));
+            $length = $runs->sum(fn (array $run): int => mb_strlen($run['text']));
             $limit = $length > $columns ? $columns - 1 : $length;
             $column = 0;
 
@@ -497,33 +506,6 @@ final readonly class OpenGraphCanvas
     private function rect(int $x1, int $y1, int $x2, int $y2, int $color): void
     {
         imagefilledrectangle($this->image, $x1 * self::SCALE, $y1 * self::SCALE, $x2 * self::SCALE - 1, $y2 * self::SCALE - 1, $color);
-    }
-
-    /**
-     * A rectangle with a circle in each corner and two rectangles crossed between them.
-     */
-    private function roundedRect(int $x1, int $y1, int $x2, int $y2, int $radius, int $color): void
-    {
-        $this->rect($x1 + $radius, $y1, $x2 - $radius, $y2, $color);
-        $this->rect($x1, $y1 + $radius, $x2, $y2 - $radius, $color);
-
-        foreach ([[$x1 + $radius, $y1 + $radius], [$x2 - $radius, $y1 + $radius], [$x1 + $radius, $y2 - $radius], [$x2 - $radius, $y2 - $radius]] as [$x, $y]) {
-            $this->circle($x, $y, $radius, $color);
-        }
-    }
-
-    /**
-     * @param  list<string>  $classes
-     */
-    private function codeColor(array $classes): int
-    {
-        foreach (array_reverse($classes) as $class) {
-            if (isset(self::CODE_COLORS[$class])) {
-                return self::CODE_COLORS[$class];
-            }
-        }
-
-        return self::CODE_INK;
     }
 
     /**

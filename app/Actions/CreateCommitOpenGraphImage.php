@@ -208,7 +208,7 @@ final readonly class CreateCommitOpenGraphImage
      */
     private function fitCode(OpenGraphCanvas $canvas, array $lines, int $height): array
     {
-        $longest = max(array_map(fn (array $runs): int => mb_strlen(implode('', array_column($runs, 'text'))), $lines));
+        $longest = collect($lines)->max(fn (array $runs): int => mb_strlen(collect($runs)->implode('text')));
         $width = self::BODY_WIDTH - 2 * OpenGraphCanvas::WINDOW_PADDING;
 
         foreach ([true, false] as $isWidthFitted) {
